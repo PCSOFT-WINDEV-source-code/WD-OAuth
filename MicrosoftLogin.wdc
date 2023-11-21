@@ -1,0 +1,142 @@
+#To edit and compare internal_properties, use WINDEV integrated tools.
+#Internal properties refer to the properties of controls in windows, reports, etc.
+info :
+ name : MicrosoftLogin
+ major_version : 28
+ minor_version : 0
+ type : 4
+ description : ""
+ subtype : 0
+class :
+ identifier : 0x182dbb8405f851b3
+ internal_properties : CAAAAAgAAAB2/vstTMCJbS/hlxjFxirSqKvCUuv8YxgpWyl7S3iA
+ code_elements :
+  type_code : 10
+  p_codes :
+   -
+     code : |1-
+      // GoogleLogin class
+      // Manages the OAuth authentication via Microsoft
+      MicrosoftLogin is Class
+      	inhérits of OAuthAppLogin
+      	
+      END
+      
+      CONSTANT LIVEAPI_VERSION = "5.0"
+     type : 131072
+  procedures :
+   -
+     name : Constructeur
+     internal_properties : CAAAAAgAAADMQkxPosVh6KvFiTuQGmjarguzq/FYmheubIIf4FrwPd3a7gn2T/j2XxyDE5dr56tNo6NMa5AGpBxB5eKm5CDNT+lAZy4P1FdUbm5Qh1JD1exhkLZPWusQkzuuy1UDSLEHtVYhuztkT0AQoeGQzcYMVFRt6YjLUNP5BVmj4/W+49WMqtp+/n0ckU9o/gOi7SbQcNXg5F3BylAEQ84LD4vjOkURmYKhlkVuxFuSeooJJHtfkMr5rt0899t3Ba2R6bQ0Ef/Qd2hCcrRGRDYxlGNyTNghMTmo1en1jk2Bp22N8B/k3JPopnLk7gY=
+     procedure_id : 1742254806572552627
+     type_code : 27
+     code : |1-
+      PROCEDURE Constructor()
+      
+      // Call the OAuthAppLogin constructor
+      Constructor OAuthAppLogin("Microsoft")
+      
+      // Describes the OAuth application
+      // The key and the secret code are supplied by Microsoft when creating a Microsoft application
+      // This information is accessible from: https://apps.dev.microsoft.com/?mkt=en-us#/appList
+      m_oOAuthService..ClientID					= ""										// 'Client ID'
+      m_oOAuthService..ClientSecret				= ""										// 'Secret client'
+      
+      dbgCheckDifferent(m_oOAuthService..ClientID, "", "CustomerID not filled")
+      dbgCheckDifferent(m_oOAuthService..ClientSecret, "", "CustomerSecret not filled")
+      
+      // The OAuth 2.0 stream requires 'Scopes', for Google, the 'Scopes' correspond to the permissions
+      // requested by the application in order to connect to a user account. 
+      // During the identification step, Google asks the user whether he accepts to give access to the
+      // informations linked to his permissions.
+      // Google documentation (https://developers.google.com/identity/protocols/OAuth2InstalledApp#formingtheurl):
+      // "Space-delimited set of scope strings."
+      m_oOAuthService..Scope						= "wl.basic" 	// Access to the user profile
+      
+      // Describes the OAuth service of Google
+      // The OAuth 2.0 stream requires two access points:
+      // - an access point to authenticate the user
+      // - an access point to get an 'AccessToken'
+      m_oOAuthService..AuthURL 					= "https://login.live.com/oauth20_authorize.srf"
+      m_oOAuthService..TokenURL					= "https://login.live.com/oauth20_token.srf"
+      m_oOAuthService..AdditionalParameters		= "display=popup"
+      
+      // The callback URL ('redirect_uri', 'callback URL' or 'Site URL') depends on the value specified in the parameters of your OAuth application
+      // described on the sites such as dev.twitter.com/apps, developers.facebook.com/apps, code.google.com/apis/console, ...
+      // In most cases, the URL must exist and the value described here must necessarily match.
+      m_oOAuthService..RedirectionURL 			= "http://localhost:9000/"
+     type : 589824
+   -
+     name : Destructeur
+     procedure_id : 1742254806572618163
+     type_code : 28
+     code : |1-
+      PROCEDURE Destructor()
+     type : 655360
+   -
+     name : ReadUserProfile
+     internal_properties : CAAAAAgAAACwn52fPE2Ti1irZN++T+6jmWG+acL6yfftoB52xyuu2c/OoEawvBMZ3mgQ5F/cnqpZikqOUDCLlQtS//kfdd1bMLuILUi4y1O7KjQUlPS3jkqwudULs6fcQzEWQZhO5Znp1NgqEO/TKCzju7aghEeW46VeyUQ/PrmSCwdBbe6YDgvl8gTsz9RV0/R7v2W0r4HP1xVGSJWlsQDDBLhWu3tEpkNAllYAiF8g+oQWjSFkyEvyj0DjVorHMhl95OPE
+     procedure_id : 1742254806572683699
+     type_code : 12
+     code : |1-
+      // Summary: Reads the user profile
+      // Syntax:
+      //[ <Result> = ] ReadUserProfile ()
+      //
+      // Parameters:
+      //	None
+      // Return value:
+      // 	OAuthWebUser: Information about the user
+      //
+      PROCEDURE VIRTUAL PROTECTED ReadUserProfile()
+      
+      // The basic information of the Microsoft user profile is described at the following address
+      // https://msdn.microsoft.com/en-us/library/office/dn659736.aspx#Requesting_info
+      
+      // Example:
+      //		{
+      //			"id": "contact.c1678ab4000000000000000000000000",
+      //			"first_name": "Roberto",
+      //			"last_name": "Tamburello",
+      //			"name": "Roberto Tamburello",
+      //			"gender": "male",
+      //			"locale": "en_US"
+      //		} 
+      
+      clInfo 		is OAuthWebUser
+      vInfo 		is variant
+      oQuery 	is a httpRequest
+      oResponse 	is a httpResponse
+      
+      oQuery..URL 		= "https://apis.live.net/v[%LIVEAPI_VERSION%]/me"
+      oQuery..AuthToken = m_oToken
+      oQuery..Method	= httpGet
+      
+      // Runs the query used to get information about the profile of the connected user
+      oResponse <- HTTPSend(oQuery)
+      IF NOT ErrorOccurred _AND_ NOT oResponse..StatusCode >= 400 THEN
+      	
+      	// Decodes the JSON response contained in the message
+      	vInfo = JSONToVariant(oResponse..Content)
+      	
+      	// Copies the data read
+      	// Caution, the strings are in ANSI/UTF-8 format
+      	// To display them, use AnsiToUnicode(<string>, charsetUTF8)
+      	clInfo.ID 			= vInfo.id
+      	clInfo.Lastname 			= vInfo.name
+      	clInfo.DisplayedName	= vInfo.name
+      END
+      
+      RESULT clInfo
+     type : 458752
+  procedure_templates : []
+  property_templates : []
+ code_parameters :
+  internal_properties : CAAAAAgAAACVGQgYbalU7DKC3oH4ItDrjtcTHXXV/EuH8q0IbhyQlw==
+  original_name : Classe1
+resources :
+ string_res :
+  identifier : 0x182dbb7f05f13e89
+  internal_properties : CAAAAAgAAACm76HWfKGWp33VjXInA4cRlqArlgTTA862QGt72W2ld5Y=
+custom_note :
+ internal_properties : CAAAAAgAAABtB9HWVzrXO2+4NDRVK0vmzaNKrCKqH1DBX30lMmGZ
